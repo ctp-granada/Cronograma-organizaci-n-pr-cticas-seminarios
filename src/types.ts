@@ -75,3 +75,11 @@ export interface FilterState {
   selectedActivityType: string; // "" = todos, "seminario", "practica"
   selectedRoom: string; // "" = todos
 }
+
+export interface CoordinatorConfig {
+  professorsList: string[];
+  professorEmails: Record<string, string>;
+  templateWeeks: TemplateWeek[];
+  lastModified?: string;
+  modifiedBy?: string;
+}

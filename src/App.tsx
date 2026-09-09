@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { FilterBar } from './components/FilterBar';
 import { MonthCalendarView } from './components/MonthCalendarView';
 import { MatrixTableView } from './components/MatrixTableView';
 import { SessionDetailModal } from './components/SessionDetailModal';
-import { FilterState, ComputedSession } from './types';
+import { CoordinatorModal } from './components/CoordinatorModal';
+import { PrintModal } from './components/PrintModal';
+import { FilterState, ComputedSession, TemplateWeek } from './types';
 import {
   getDefaultStartMonday,
   formatDateToISO,
@@ -12,12 +14,156 @@ import {
   computeAllSessions,
   generateICS,
 } from './utils/perpetualDateUtils';
-import { COURSE_INFO } from './data/curriculumData';
-import { Check, Calendar, Download, GraduationCap, Info } from 'lucide-react';
+import { COURSE_INFO, PROFESSORS_LIST, PROFESSOR_EMAILS, TEMPLATE_WEEKS } from './data/curriculumData';
+import { Check, Calendar, Download, GraduationCap, Info, ShieldCheck, Settings, LogOut } from 'lucide-react';
 
 export default function App() {
   // Current academic year default: 2026
   const [academicYear, setAcademicYear] = useState<number>(2026);
+
+  // Coordinator Authentication & Modal State
+  const [coordinatorEmail, setCoordinatorEmail] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('ugr_coordinator_email');
+    } catch {
+      return null;
+    }
+  });
+  const [isCoordinatorModalOpen, setIsCoordinatorModalOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+
+  // Dynamic Teaching Staff & Assignments per academic year
+  const [professorsList, setProfessorsList] = useState<string[]>(() => {
+    try {
+      // 1. Check URL hash for shared configuration
+      if (window.location.hash.startsWith('#docencia=')) {
+        const encoded = decodeURIComponent(window.location.hash.replace('#docencia=', ''));
+        const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+        if (parsed.professorsList) return parsed.professorsList;
+      }
+      // 2. Check localStorage
+      const saved = localStorage.getItem('ugr_professors_list');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading stored professors', e);
+    }
+    return PROFESSORS_LIST;
+  });
+
+  const [professorEmails, setProfessorEmails] = useState<Record<string, string>>(() => {
+    try {
+      if (window.location.hash.startsWith('#docencia=')) {
+        const encoded = decodeURIComponent(window.location.hash.replace('#docencia=', ''));
+        const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+        if (parsed.professorEmails) return parsed.professorEmails;
+      }
+      const saved = localStorage.getItem('ugr_professor_emails');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading stored emails', e);
+    }
+    return PROFESSOR_EMAILS;
+  });
+
+  const [templateWeeks, setTemplateWeeks] = useState<TemplateWeek[]>(() => {
+    try {
+      if (window.location.hash.startsWith('#docencia=')) {
+        const encoded = decodeURIComponent(window.location.hash.replace('#docencia=', ''));
+        const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+        if (parsed.templateWeeks) return parsed.templateWeeks;
+      }
+      const saved = localStorage.getItem(`ugr_template_weeks_${2026}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading stored template weeks', e);
+    }
+    return TEMPLATE_WEEKS;
+  });
+
+  // Persist coordinator changes to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('ugr_professors_list', JSON.stringify(professorsList));
+      localStorage.setItem('ugr_professor_emails', JSON.stringify(professorEmails));
+      localStorage.setItem(`ugr_template_weeks_${academicYear}`, JSON.stringify(templateWeeks));
+    } catch (e) {
+      console.warn('Could not persist to localStorage', e);
+    }
+  }, [professorsList, professorEmails, templateWeeks, academicYear]);
+
+  // Handle coordinator login & logout
+  const handleCoordinatorLogin = (email: string) => {
+    setCoordinatorEmail(email);
+    try {
+      localStorage.setItem('ugr_coordinator_email', email);
+    } catch {}
+    showToast(`Identificado como coordinador: ${email}`);
+  };
+
+  const handleCoordinatorLogout = () => {
+    setCoordinatorEmail(null);
+    try {
+      localStorage.removeItem('ugr_coordinator_email');
+    } catch {}
+    showToast('Sesión de coordinación cerrada.');
+  };
+
+  const handleResetToDefaults = () => {
+    setProfessorsList(PROFESSORS_LIST);
+    setProfessorEmails(PROFESSOR_EMAILS);
+    setTemplateWeeks(TEMPLATE_WEEKS);
+    try {
+      localStorage.removeItem('ugr_professors_list');
+      localStorage.removeItem('ugr_professor_emails');
+      localStorage.removeItem(`ugr_template_weeks_${academicYear}`);
+    } catch {}
+    showToast('Asignaciones restablecidas a los valores iniciales oficiales de la UGR.');
+  };
+
+  // Reassign professor directly from session modal
+  const handleReassignSessionProfessor = (
+    weekIndex: number,
+    shift: 'morning' | 'afternoon',
+    groupNumber: number,
+    newProfessor: string
+  ) => {
+    const updatedWeeks = templateWeeks.map((week) => {
+      if (week.weekIndex !== weekIndex) return week;
+
+      const shiftAssignments = { ...week.assignments[shift] };
+      Object.keys(shiftAssignments).forEach((d) => {
+        const dayNum = Number(d);
+        if (shiftAssignments[dayNum]?.groupNumber === groupNumber) {
+          shiftAssignments[dayNum] = {
+            ...shiftAssignments[dayNum],
+            professor: newProfessor,
+          };
+        }
+      });
+
+      return {
+        ...week,
+        assignments: {
+          ...week.assignments,
+          [shift]: shiftAssignments,
+        },
+      };
+    });
+
+    setTemplateWeeks(updatedWeeks);
+    showToast(`Profesor de Subgrupo ${groupNumber} actualizado a ${newProfessor}.`);
+  };
+
+  // Generation date formatted for printable document
+  const generationDateStr = useMemo(() => {
+    return new Intl.DateTimeFormat('es-ES', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date());
+  }, []);
 
   // Start Monday date state
   const defaultMonday = useMemo(() => getDefaultStartMonday(academicYear), [academicYear]);
@@ -54,14 +200,33 @@ export default function App() {
     setAcademicYear(newYear);
     const newDefaultMonday = getDefaultStartMonday(newYear);
     setStartMondayStr(formatDateToISO(newDefaultMonday));
+
+    // Check if there is already a saved template for the new year
+    try {
+      const savedForYear = localStorage.getItem(`ugr_template_weeks_${newYear}`);
+      if (savedForYear) {
+        setTemplateWeeks(JSON.parse(savedForYear));
+      }
+    } catch {}
+
     showToast(`Curso actualizado a ${newYear} - ${newYear + 1}`);
   };
 
-  // Compute all sessions for the semester
+  // Compute all sessions dynamically using templateWeeks and professorEmails
   const allComputedSessions = useMemo(() => {
     const parsedStart = parseISODate(startMondayStr);
-    return computeAllSessions(parsedStart);
-  }, [startMondayStr]);
+    return computeAllSessions(parsedStart, templateWeeks, professorEmails);
+  }, [startMondayStr, templateWeeks, professorEmails]);
+
+  // Keep selectedSession in sync if reallocated
+  useEffect(() => {
+    if (selectedSession) {
+      const updated = allComputedSessions.find((s) => s.id === selectedSession.id);
+      if (updated && updated.professor !== selectedSession.professor) {
+        setSelectedSession(updated);
+      }
+    }
+  }, [allComputedSessions, selectedSession]);
 
   // Apply filters
   const filteredSessions = useMemo(() => {
@@ -126,7 +291,20 @@ export default function App() {
   };
 
   const handlePrint = () => {
-    window.print();
+    // Attempt standard print first
+    try {
+      window.print();
+    } catch (e) {
+      console.warn('Direct window.print() failed', e);
+    }
+
+    // If running in an iframe (e.g. AI Studio preview, PRADO LMS),
+    // modern browsers block or suppress print dialogs from frames.
+    // We open PrintModal so the user can open it in a clean tab or get assistance.
+    const isInsideIframe = window.self !== window.top;
+    if (isInsideIframe) {
+      setIsPrintModalOpen(true);
+    }
   };
 
   const currentStartMondayDate = useMemo(() => parseISODate(startMondayStr), [startMondayStr]);
@@ -142,7 +320,39 @@ export default function App() {
         onViewChange={setActiveView}
         onExportICS={handleExportICS}
         onPrint={handlePrint}
+        coordinatorEmail={coordinatorEmail}
+        onOpenCoordinator={() => setIsCoordinatorModalOpen(true)}
       />
+
+      {/* Coordinator Active Bar */}
+      {coordinatorEmail && (
+        <div className="no-print bg-gradient-to-r from-emerald-800 to-teal-900 text-white px-4 py-2 text-xs shadow-xs border-b border-emerald-700">
+          <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>
+                <strong>Modo Coordinación Docente:</strong> Conectado como <span className="font-mono underline">{coordinatorEmail}</span>. Puedes reasignar profesores, añadir docentes o guardar cambios para años siguientes.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCoordinatorModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors shadow-2xs"
+              >
+                Panel de Coordinación
+              </button>
+              <button
+                type="button"
+                onClick={handleCoordinatorLogout}
+                className="px-2 py-1 rounded-lg bg-black/30 hover:bg-black/40 text-emerald-200 transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar for Students */}
       <div id="filter-bar-container">
@@ -163,6 +373,41 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* Printable Document Header (Appears only on print / PDF export) */}
+        <div className="print-only print-header hidden mb-6 pb-4 border-b-2 border-slate-900">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Universidad de Granada • Facultad de Ciencias de la Salud
+              </div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
+                {COURSE_INFO.subject} • {COURSE_INFO.degree}
+              </h1>
+              <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 mt-1">
+                <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+                  Grupos Oficiales: {COURSE_INFO.groups}
+                </span>
+                <span>•</span>
+                <span>Laboratorio 2.21 (Prácticas) / Aula 2.15 (Seminarios)</span>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <div className="text-sm font-black text-emerald-950 bg-emerald-50 px-3 py-1 rounded border border-emerald-300 inline-block">
+                Curso Académico: {academicYear} - {academicYear + 1}
+              </div>
+              <div className="text-[11px] text-slate-600 mt-1.5 font-medium">
+                Fecha de generación: <strong className="text-slate-900">{generationDateStr}</strong>
+              </div>
+              {filters.selectedGroup && (
+                <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">
+                  Filtro aplicado: Subgrupo {filters.selectedGroup}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         
         {/* Student Welcome & Navigation Quick Bar */}
         <div className="no-print bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between flex-wrap gap-4">
@@ -268,6 +513,7 @@ export default function App() {
               if (session) setSelectedSession(session);
             }}
             computedSessions={filteredSessions}
+            templateWeeks={templateWeeks}
           />
         )}
 
@@ -306,8 +552,39 @@ export default function App() {
           session={selectedSession}
           onClose={() => setSelectedSession(null)}
           academicYear={academicYear}
+          isCoordinator={!!coordinatorEmail}
+          professorsList={professorsList}
+          onReassignSessionProfessor={handleReassignSessionProfessor}
         />
       )}
+
+      {/* Coordinator Management Modal */}
+      <CoordinatorModal
+        isOpen={isCoordinatorModalOpen}
+        onClose={() => setIsCoordinatorModalOpen(false)}
+        coordinatorEmail={coordinatorEmail}
+        onLogin={handleCoordinatorLogin}
+        onLogout={handleCoordinatorLogout}
+        professorsList={professorsList}
+        professorEmails={professorEmails}
+        templateWeeks={templateWeeks}
+        academicYear={academicYear}
+        onUpdateProfessorList={(newList, newEmails) => {
+          setProfessorsList(newList);
+          setProfessorEmails(newEmails);
+        }}
+        onUpdateTemplateWeeks={setTemplateWeeks}
+        onResetToDefaults={handleResetToDefaults}
+      />
+
+      {/* Print Assistant Modal */}
+      <PrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        academicYear={academicYear}
+        selectedGroup={filters.selectedGroup}
+        generationDateStr={generationDateStr}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

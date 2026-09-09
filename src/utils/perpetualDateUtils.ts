@@ -60,11 +60,23 @@ export function formatWeekRange(startMonday: Date, weekOffset: number): string {
 /**
  * Computes all individual practice/seminar sessions based on the academic year config.
  */
-export function computeAllSessions(startMonday: Date): ComputedSession[] {
+export function computeAllSessions(
+  startMonday: Date,
+  customTemplateWeeks?: TemplateWeek[],
+  customProfessorEmails?: Record<string, string>
+): ComputedSession[] {
   const sessions: ComputedSession[] = [];
   const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+  const weeksToUse = customTemplateWeeks || TEMPLATE_WEEKS;
 
-  TEMPLATE_WEEKS.forEach((templateWeek) => {
+  const resolveEmail = (profName: string) => {
+    if (customProfessorEmails && customProfessorEmails[profName]) {
+      return customProfessorEmails[profName];
+    }
+    return getProfessorEmail(profName);
+  };
+
+  weeksToUse.forEach((templateWeek) => {
     if (templateWeek.isHolidayWeek) return;
 
     const weekMonday = new Date(startMonday);
@@ -100,7 +112,7 @@ export function computeAllSessions(startMonday: Date): ComputedSession[] {
           groupNumber: assignment.groupNumber,
           groupLetter: groupInfo?.letter || 'B',
           professor: assignment.professor,
-          professorEmail: getProfessorEmail(assignment.professor),
+          professorEmail: resolveEmail(assignment.professor),
           credits: COURSE_INFO.creditsPerGroup,
         });
       }
@@ -136,7 +148,7 @@ export function computeAllSessions(startMonday: Date): ComputedSession[] {
           groupNumber: assignment.groupNumber,
           groupLetter: groupInfo?.letter || 'C',
           professor: assignment.professor,
-          professorEmail: getProfessorEmail(assignment.professor),
+          professorEmail: resolveEmail(assignment.professor),
           credits: COURSE_INFO.creditsPerGroup,
         });
       }

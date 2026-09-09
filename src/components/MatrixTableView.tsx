@@ -1,7 +1,7 @@
 import React from 'react';
 import { TEMPLATE_WEEKS, getProfessorEmail } from '../data/curriculumData';
 import { formatWeekRange } from '../utils/perpetualDateUtils';
-import { ComputedSession, FilterState } from '../types';
+import { ComputedSession, FilterState, TemplateWeek } from '../types';
 import { Clock, MapPin, User, Calendar, ExternalLink, Mail } from 'lucide-react';
 
 interface MatrixTableViewProps {
@@ -10,6 +10,7 @@ interface MatrixTableViewProps {
   filters: FilterState;
   onSelectSessionById: (sessionId: string) => void;
   computedSessions: ComputedSession[];
+  templateWeeks?: TemplateWeek[];
 }
 
 export const MatrixTableView: React.FC<MatrixTableViewProps> = ({
@@ -18,6 +19,7 @@ export const MatrixTableView: React.FC<MatrixTableViewProps> = ({
   filters,
   onSelectSessionById,
   computedSessions,
+  templateWeeks = TEMPLATE_WEEKS,
 }) => {
   // Map sessions for fast lookup: key = `w${weekIndex}-${shift}-${day}`
   const sessionsMap: Record<string, ComputedSession> = {};
@@ -57,10 +59,10 @@ export const MatrixTableView: React.FC<MatrixTableViewProps> = ({
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-['Outfit'] flex items-center gap-2">
-            <span>Cronograma Oficial Perpetuo (Matriz Departamental)</span>
+            <span>Cronograma Oficial de la Asignatura</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Estructura idéntica al cronograma oficial con fechas calculadas dinámicamente para el curso {academicYear} - {academicYear + 1}.
+            Estructura completa de semanas, subgrupos, aulas y profesorado para el curso {academicYear} - {academicYear + 1}.
           </p>
         </div>
 
@@ -102,7 +104,7 @@ export const MatrixTableView: React.FC<MatrixTableViewProps> = ({
                 </tr>
 
                 {sec.weekIndices.map((weekIdx) => {
-                  const week = TEMPLATE_WEEKS.find((w) => w.weekIndex === weekIdx);
+                  const week = templateWeeks.find((w) => w.weekIndex === weekIdx);
                   if (!week) return null;
 
                   const dateRange = formatWeekRange(startMonday, week.weekOffsetFromStart);

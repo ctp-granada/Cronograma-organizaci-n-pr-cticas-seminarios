@@ -22,14 +22,22 @@ interface SessionDetailModalProps {
   session: ComputedSession | null;
   onClose: () => void;
   academicYear: number;
+  isCoordinator?: boolean;
+  professorsList?: string[];
+  onReassignSessionProfessor?: (weekIndex: number, shift: 'morning' | 'afternoon', groupNumber: number, newProfessor: string) => void;
 }
 
 export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
   session,
   onClose,
   academicYear,
+  isCoordinator,
+  professorsList = [],
+  onReassignSessionProfessor,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isEditingTeacher, setIsEditingTeacher] = useState(false);
+  const [selectedProf, setSelectedProf] = useState(session?.professor || '');
 
   if (!session) return null;
 
@@ -159,58 +167,111 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
           </div>
 
           {/* Teacher in Charge Card with Direct Email Action */}
-          <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
-                {session.professor.charAt(0)}
-              </div>
-              <div>
-                <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">
-                  Profesor(a) Responsable
-                </span>
-                <span className="text-base font-bold text-slate-900 block">
-                  {session.professor}
-                </span>
-                {session.professorEmail && (
-                  <span className="text-xs text-emerald-900 font-mono flex items-center gap-1 mt-0.5">
-                    <Mail className="w-3 h-3 text-emerald-700" />
-                    {session.professorEmail}
+          <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                  {session.professor.charAt(0)}
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">
+                    Profesor(a) Responsable
                   </span>
+                  <span className="text-base font-bold text-slate-900 block">
+                    {session.professor}
+                  </span>
+                  {session.professorEmail && (
+                    <span className="text-xs text-emerald-900 font-mono flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3 text-emerald-700" />
+                      {session.professorEmail}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Email contact buttons & Coordinator edit toggle */}
+              <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
+                {session.professorEmail && (
+                  <>
+                    <a
+                      href={`mailto:${session.professorEmail}?subject=${encodeURIComponent(
+                        `Consulta Bioquímica Enfermería - Grupo ${session.groupNumber} (${session.activityCode})`
+                      )}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition-colors"
+                      title="Abrir cliente de correo"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Enviar correo</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleCopyEmail}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-emerald-50 text-slate-700 border border-emerald-300 transition-colors"
+                      title="Copiar dirección de correo"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-semibold">Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copiar</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+
+                {isCoordinator && onReassignSessionProfessor && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingTeacher(!isEditingTeacher);
+                      setSelectedProf(session.professor);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300 transition-colors"
+                    title="Reasignar profesor de este subgrupo (Modo Coordinación)"
+                  >
+                    {isEditingTeacher ? 'Cancelar' : 'Reasignar'}
+                  </button>
                 )}
               </div>
             </div>
 
-            {/* Email contact buttons */}
-            {session.professorEmail && (
-              <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
-                <a
-                  href={`mailto:${session.professorEmail}?subject=${encodeURIComponent(
-                    `Consulta Bioquímica Enfermería - Grupo ${session.groupNumber} (${session.activityCode})`
-                  )}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition-colors"
-                  title="Abrir cliente de correo"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Enviar correo</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={handleCopyEmail}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-emerald-50 text-slate-700 border border-emerald-300 transition-colors"
-                  title="Copiar dirección de correo"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700 font-semibold">Copiado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Copiar</span>
-                    </>
-                  )}
-                </button>
+            {/* Coordinator Quick Reassign Dropdown */}
+            {isCoordinator && isEditingTeacher && onReassignSessionProfessor && (
+              <div className="pt-3 border-t border-emerald-200/80 flex items-center justify-between gap-2 flex-wrap bg-white/70 p-2.5 rounded-lg">
+                <span className="text-xs font-bold text-slate-800">
+                  Asignar a este subgrupo:
+                </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedProf}
+                    onChange={(e) => setSelectedProf(e.target.value)}
+                    className="text-xs p-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900"
+                  >
+                    {professorsList.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onReassignSessionProfessor(
+                        session.weekIndex,
+                        session.shift,
+                        session.groupNumber,
+                        selectedProf
+                      );
+                      setIsEditingTeacher(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 shadow-2xs"
+                  >
+                    Guardar
+                  </button>
+                </div>
               </div>
             )}
           </div>
