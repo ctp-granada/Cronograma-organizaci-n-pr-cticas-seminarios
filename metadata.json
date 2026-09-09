@@ -1,0 +1,6 @@
+{
+  "name": "Calendario de prácticas y seminarios de Bioquímica",
+  "description": "Calendario de prácticas y seminarios de Bioquímica para los alumnos del Grado en Enfermería (Grupos B y C) de la Universidad de Granada.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
