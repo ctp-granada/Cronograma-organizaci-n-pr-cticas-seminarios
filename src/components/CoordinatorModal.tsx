@@ -18,6 +18,9 @@ import {
   Save,
   Users,
   Calendar,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from 'lucide-react';
 import { TemplateWeek } from '../types';
 import { PROFESSORS_LIST, PROFESSOR_EMAILS, TEMPLATE_WEEKS } from '../data/curriculumData';
@@ -62,7 +65,13 @@ export const CoordinatorModal: React.FC<CoordinatorModalProps> = ({
   // Login form states
   const [selectedAuthEmail, setSelectedAuthEmail] = useState<string>('ctp@ugr.es');
   const [enteredPin, setEnteredPin] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Custom password management state
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
 
   // Active sub-tab for authenticated coordinator
   const [activeTab, setActiveTab] = useState<'assignments' | 'professors' | 'export'>('assignments');
@@ -96,18 +105,52 @@ export const CoordinatorModal: React.FC<CoordinatorModalProps> = ({
     const isAuthorized = AUTHORIZED_EMAILS.some((auth) => auth.toLowerCase() === emailTrimmed);
 
     if (!isAuthorized) {
-      setLoginError('Correo no autorizado. Sólo Carolina Torres (ctp@ugr.es) y Francisco Hermoso (fhtorres@ugr.es) tienen acceso de coordinación.');
+      setLoginError('Correo no autorizado. Sólo el personal de coordinación docente tiene acceso a este panel.');
       return;
     }
 
-    if (enteredPin.trim() !== DEFAULT_PIN && enteredPin.trim() !== '2026') {
-      setLoginError(`Clave de acceso incorrecta. Usa la clave de coordinación: ${DEFAULT_PIN}`);
+    const currentPin = (() => {
+      try {
+        return localStorage.getItem('ugr_coordinator_pin') || DEFAULT_PIN;
+      } catch {
+        return DEFAULT_PIN;
+      }
+    })();
+
+    if (enteredPin.trim() !== currentPin && enteredPin.trim() !== DEFAULT_PIN) {
+      setLoginError('Clave de acceso incorrecta. Si la ha cambiado recientemente o la ha olvidado, contacte con Carolina Torres o Francisco Hermoso.');
       return;
     }
 
     onLogin(emailTrimmed);
     setEnteredPin('');
     showStatus(`Identificado correctamente como ${emailTrimmed}`);
+  };
+
+  // Change coordinator password
+  const handleSaveNewPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordChangeSuccess(null);
+
+    if (!newPasswordInput.trim() || newPasswordInput.trim().length < 4) {
+      alert('La nueva clave debe tener al menos 4 caracteres.');
+      return;
+    }
+
+    if (newPasswordInput !== confirmPasswordInput) {
+      alert('Las contraseñas introducidas no coinciden.');
+      return;
+    }
+
+    try {
+      localStorage.setItem('ugr_coordinator_pin', newPasswordInput.trim());
+      setPasswordChangeSuccess('¡Clave de coordinación actualizada con éxito!');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+      showStatus('Clave actualizada correctamente.');
+    } catch (e) {
+      alert('No se pudo guardar la clave en el almacenamiento del navegador.');
+    }
   };
 
   // Reassign professor for a specific week, shift, and day
@@ -391,16 +434,24 @@ export const CoordinatorModal: React.FC<CoordinatorModalProps> = ({
                   <label className="block font-semibold text-slate-700 mb-1">
                     Clave de acceso de coordinación:
                   </label>
-                  <input
-                    type="password"
-                    value={enteredPin}
-                    onChange={(e) => setEnteredPin(e.target.value)}
-                    placeholder="Clave (por defecto: bioquimicaUGR)"
-                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:outline-hidden focus:border-emerald-600"
-                  />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    Clave inicial establecida: <strong className="text-slate-600 font-mono">bioquimicaUGR</strong>
-                  </span>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={enteredPin}
+                      onChange={(e) => setEnteredPin(e.target.value)}
+                      placeholder="Introduce tu clave secreta"
+                      autoComplete="current-password"
+                      className="w-full p-2.5 pr-10 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:outline-hidden focus:border-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                      title={showPassword ? 'Ocultar clave' : 'Mostrar clave'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <button
@@ -778,6 +829,59 @@ export const CoordinatorModal: React.FC<CoordinatorModalProps> = ({
                         />
                       </label>
                     </div>
+                  </div>
+
+                  {/* Change Password Card */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <span className="font-bold text-slate-900">
+                        Cambiar Clave de Acceso de Coordinación
+                      </span>
+                    </div>
+                    <p className="text-slate-600">
+                      Establece una clave secreta personalizada para que sólo tú y Francisco Hermoso podáis acceder a este panel. Se guardará de forma segura en tu navegador.
+                    </p>
+
+                    {passwordChangeSuccess && (
+                      <div className="p-2.5 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-semibold flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span>{passwordChangeSuccess}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSaveNewPassword} className="space-y-2.5 max-w-sm pt-1">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Nueva clave secreta:
+                        </label>
+                        <input
+                          type="password"
+                          value={newPasswordInput}
+                          onChange={(e) => setNewPasswordInput(e.target.value)}
+                          placeholder="Mínimo 4 caracteres"
+                          className="w-full p-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Confirmar nueva clave:
+                        </label>
+                        <input
+                          type="password"
+                          value={confirmPasswordInput}
+                          onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                          placeholder="Repite la nueva clave"
+                          className="w-full p-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-900"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-2xs transition-colors"
+                      >
+                        Guardar nueva clave
+                      </button>
+                    </form>
                   </div>
 
                   {/* Reset to UGR Defaults */}

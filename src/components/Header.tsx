@@ -137,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200 shadow-2xs'
                     : 'bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border-slate-200'
                 }`}
-                title="Acceso exclusivo para Carolina Torres (ctp@ugr.es) y Francisco Hermoso (fhtorres@ugr.es)"
+                title="Acceso restringido para el profesorado coordinador"
               >
                 {coordinatorEmail ? (
                   <>
