@@ -9,15 +9,17 @@ import {
   Table as TableIcon,
   CalendarDays,
   Mail,
+  BookOpen,
+  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { COURSE_INFO } from '../data/curriculumData';
-import { ShieldCheck, Lock } from 'lucide-react';
 
 interface HeaderProps {
   academicYear: number;
   onYearChange: (year: number) => void;
-  activeView: 'month' | 'matrix';
-  onViewChange: (view: 'month' | 'matrix') => void;
+  activeView: 'month' | 'matrix' | 'theory';
+  onViewChange: (view: 'month' | 'matrix' | 'theory') => void;
   onExportICS: () => void;
   onPrint: () => void;
   coordinatorEmail?: string | null;
@@ -185,6 +187,20 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <TableIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Cronograma Completo</span>
+            </button>
+
+            <button
+              type="button"
+              id="tab-view-theory"
+              onClick={() => onViewChange('theory')}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${
+                activeView === 'theory'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Planificación Temporal Teoría</span>
             </button>
           </div>
 

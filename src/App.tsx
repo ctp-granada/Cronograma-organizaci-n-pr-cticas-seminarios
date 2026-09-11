@@ -6,6 +6,7 @@ import { MatrixTableView } from './components/MatrixTableView';
 import { SessionDetailModal } from './components/SessionDetailModal';
 import { CoordinatorModal } from './components/CoordinatorModal';
 import { PrintModal } from './components/PrintModal';
+import { TheoryScheduleView } from './components/TheoryScheduleView';
 import { FilterState, ComputedSession, TemplateWeek } from './types';
 import {
   getDefaultStartMonday,
@@ -169,8 +170,8 @@ export default function App() {
   const defaultMonday = useMemo(() => getDefaultStartMonday(academicYear), [academicYear]);
   const [startMondayStr, setStartMondayStr] = useState<string>(() => formatDateToISO(getDefaultStartMonday(2026)));
 
-  // Active navigation view: 'month' (default) or 'matrix' (simplified for students)
-  const [activeView, setActiveView] = useState<'month' | 'matrix'>('month');
+  // Active navigation view: 'month' (default), 'matrix', or 'theory'
+  const [activeView, setActiveView] = useState<'month' | 'matrix' | 'theory'>('month');
 
   // Selected month for Month Calendar view (October is 9)
   const [calendarMonthIndex, setCalendarMonthIndex] = useState<number>(9);
@@ -488,6 +489,18 @@ export default function App() {
             >
               Cronograma Completo
             </button>
+            <button
+              type="button"
+              id="banner-btn-theory"
+              onClick={() => setActiveView('theory')}
+              className={`px-3 py-1.5 text-xs rounded-lg font-semibold border transition-all ${
+                activeView === 'theory'
+                  ? 'bg-indigo-700 text-white border-indigo-700 shadow-2xs'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+            >
+              Planificación Teoría
+            </button>
           </div>
         </div>
 
@@ -514,6 +527,17 @@ export default function App() {
             }}
             computedSessions={filteredSessions}
             templateWeeks={templateWeeks}
+          />
+        )}
+
+        {activeView === 'theory' && (
+          <TheoryScheduleView
+            startMonday={currentStartMondayDate}
+            academicYear={academicYear}
+            onSelectActivity={(activityCode) => {
+              setFilters((prev) => ({ ...prev, searchQuery: activityCode }));
+              setActiveView('matrix');
+            }}
           />
         )}
 
